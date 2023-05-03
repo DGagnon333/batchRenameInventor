@@ -1,23 +1,20 @@
 Sub Main
-    ' Prompt the user for the matching pattern and new pattern
-    Dim matchPattern As String = InputBox("Enter the matching pattern:")
+    Dim matchingPattern As String = InputBox("Enter the matching pattern:")
     Dim newPattern As String = InputBox("Enter the new pattern:")
 
-    ' Rename the files that match the pattern
-    Dim currentDirectory As String = ThisDoc.Path
-    Dim files As String() = System.IO.Directory.GetFiles(currentDirectory, "*.ipt").Concat(System.IO.Directory.GetFiles(currentDirectory, "*.iam")).ToArray()
+    Dim doc As Document = ThisDoc.Document
 
-    For Each file As String In files
-        If System.IO.Path.GetFileNameWithoutExtension(file).Contains(matchPattern) Then
-            Dim newFileName As String = System.IO.Path.Combine(currentDirectory, System.IO.Path.GetFileNameWithoutExtension(file).Replace(matchPattern, newPattern) & System.IO.Path.GetExtension(file))
-            System.IO.File.Move(file, newFileName)
+    For Each file As Document In doc.AllReferencedDocuments
+        Dim fileName As String = file.FullFileName
+        Dim fileDir As String = System.IO.Path.GetDirectoryName(fileName)
+        Dim fileExt As String = System.IO.Path.GetExtension(fileName)
+        Dim newName As String = System.IO.Path.GetFileNameWithoutExtension(fileName)
+
+        If newName.Contains(matchingPattern) Then
+            newName = newName.Replace(matchingPattern, newPattern)
+            newName = System.IO.Path.Combine(fileDir, newName + fileExt)
+            System.IO.File.Move(fileName, newName)
+            file.FullFileName = newName
         End If
     Next
-
-    ' Update all references to the renamed files in the active document
-    Dim oDoc As Document = ThisDoc.Document
-    oDoc.Update()
-
-    ' Show a message box indicating the rename is complete
-    MsgBox("Rename complete.")
 End Sub
