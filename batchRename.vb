@@ -1,20 +1,23 @@
-Sub Main
-    Dim matchingPattern As String = InputBox("Enter the matching pattern:")
-    Dim newPattern As String = InputBox("Enter the new pattern:")
+Sub main
+	Dim matchingPattern As String = InputBox("Enter the matching pattern:")
+	Dim newPattern As String = InputBox("Enter the new pattern:")
+	Dim warning = MsgBox("Warning! are you sure you want to replace '"+ matchingPattern + "' with '" + newPattern + "'?", vbOKCancel, " warning ")
+	
+	If warning = vbCancel Then Exit Sub
+	
+	'Get the current directory
+    Dim folderPath As String = ThisDoc.Path
+	Dim invApp As Inventor.Application = ThisApplication
 
-    Dim doc As Document = ThisDoc.Document
-
-    For Each file As Document In doc.AllReferencedDocuments
-        Dim fileName As String = file.FullFileName
-        Dim fileDir As String = System.IO.Path.GetDirectoryName(fileName)
-        Dim fileExt As String = System.IO.Path.GetExtension(fileName)
-        Dim newName As String = System.IO.Path.GetFileNameWithoutExtension(fileName)
-
-        If newName.Contains(matchingPattern) Then
-            newName = newName.Replace(matchingPattern, newPattern)
-            newName = System.IO.Path.Combine(fileDir, newName + fileExt)
-            System.IO.File.Move(fileName, newName)
-            file.FullFileName = newName
-        End If
+    ' Get the list of files in the folder
+    Dim files As String() = System.IO.Directory.GetFiles(folderPath, matchingPattern)
+    
+    ' Loop through the files and rename them
+    For Each file As String In files
+        Dim newName As String = Replace(file, matchingPattern, newPattern, , , CompareMethod.Text)
+        System.IO.File.Move(fileName, newName)
     Next
+    
+    ' Refresh the file list
+    invApp.FileManager.RefreshAllDocuments()
 End Sub
