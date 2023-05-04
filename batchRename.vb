@@ -1,4 +1,4 @@
-Sub main
+Sub main()
     ' Get the active document
     Dim activeDoc As Document = ThisApplication.ActiveDocument
 
@@ -7,66 +7,73 @@ Sub main
         MsgBox("This script is intended to be used with part and assembly documents only.")
         Exit Sub
     End If
-	
-	Dim matchingPattern As String = InputBox("Enter the matching pattern:")
-	
-	If matchingPattern = ""
-		MsgBox("matching pattern can't be empty")
-		Exit Sub
-	End If
-	
-	Dim newPattern As String = InputBox("Enter the new pattern:")
-	Dim warning = MsgBox("Warning! are you sure you want to replace '"+ matchingPattern + "' with '" + newPattern + "'?", vbOKCancel, " warning ")
-	
-	If warning = vbCancel Then 
-		Exit Sub
-	End If
 
-    ' Get the full path and filename of the active document
-    Dim filePath As String = activeDoc.FullFileName
-    Dim folderPath As String = System.IO.Path.GetDirectoryName(filePath)
+    ' Get the matching and new patterns
+    Dim matchingPattern As String = InputBox("Enter the matching pattern:")
+    If matchingPattern = "" Then
+        MsgBox("Matching pattern cannot be empty.")
+        Exit Sub
+    End If
 
-    ' Get the list of files in the folder
-    Dim files As String() = System.IO.Directory.GetFiles(folderPath, matchingPattern)
+    Dim newPattern As String = InputBox("Enter the new pattern:")
+    If newPattern = "" Then
+        MsgBox("New pattern cannot be empty.")
+        Exit Sub
+    End If
 
-    ' Loop through the files and rename them
-    For Each file As String In files
-        Dim oldName As String = System.IO.Path.GetFileNameWithoutExtension(File)
-        Dim newName As String = Replace(oldName, matchingPattern, newPattern, , , CompareMethod.Text)
-        Dim newFile As String = System.IO.Path.Combine(folderPath, newName & System.IO.Path.GetExtension(File))
-        System.IO.File.Move(File, newFile)
+    ' Rename the components in the active document
+    If TypeOf activeDoc Is PartDocument Then
+        Dim partDoc As PartDocument = CType(activeDoc, PartDocument)
+        RenamePartComponents(partDoc, matchingPattern, newPattern)
+    Else
+        Dim asmDoc As AssemblyDocument = CType(activeDoc, AssemblyDocument)
+        RenameAssemblyComponents(asmDoc, matchingPattern, newPattern)
+    End If
 
-        ' Open the new document
-        Dim doc As Document = ThisApplication.Documents.Open(newFile, False)
+    ' Display a message when renaming is complete
+    MsgBox("Renaming complete.")
+End Sub
 
-        ' Rename the component occurrence
-        If TypeOf doc Is PartDocument Then
-            Dim partDoc As PartDocument = CType(doc, PartDocument)
-            Dim partCompDef As PartComponentDefinition = partDoc.ComponentDefinition
+Sub RenameAssemblyComponents(doc As AssemblyDocument, matchingPattern As String, newPattern As String)
+    Dim compOccs As IEnumerable(Of ComponentOccurrence) = doc.ComponentDefinition.Occurrences.OfType(Of ComponentOccurrence)()
 
-            For Each occ As ComponentOccurrence In partCompDef.Occurrences
-                Dim occName As String = occ.Name
-                Dim newOccName As String = Replace(occName, matchingPattern, newPattern, , , CompareMethod.Text)
-                occ.Rename(newOccName)
-            Next
-
-            partDoc.Save()
-        ElseIf TypeOf doc Is AssemblyDocument Then
-            Dim assyDoc As AssemblyDocument = CType(doc, AssemblyDocument)
-            Dim assyCompDef As AssemblyComponentDefinition = assyDoc.ComponentDefinition
-
-            For Each occ As ComponentOccurrence In assyCompDef.Occurrences
-                Dim occName As String = occ.Name
-                Dim newOccName As String = Replace(occName, matchingPattern, newPattern, , , CompareMethod.Text)
-                occ.Rename(newOccName)
-            Next
-
-            assyDoc.Save()
-        End If
-
-        doc.Close()
+    For Each compOcc As ComponentOccurrence In compOccs
+        Dim occName As String = compOcc.Name
+        Dim newOccName As String = Replace(occName, matchingPattern, newPattern, , , CompareMethod.Text)
+        compOcc.Name = newOccName
     Next
 
-    ' Refresh the file list
-    ThisApplication.FileManager.RefreshAllDocuments()
+    ' Recursively rename occurrences in referenced documents
+    For Each refDoc As Document In doc.AllReferencedDocuments
+        If TypeOf refDoc Is File Then
+            Dim file As File = refDoc.File
+            If file.FileType = FileTypeEnum.kAssemblyFileType Then
+                RenameAssemblyComponents(refDoc, matchingPattern, newPattern)
+            ElseIf file.FileType = FileTypeEnum.kPartFileType Then
+                RenamePartComponents(refDoc, matchingPattern, newPattern)
+            End If
+        End If
+    Next
+End Sub
+
+Sub RenamePartComponents(doc As PartDocument, matchingPattern As String, newPattern As String)
+    Dim compOccs As IEnumerable(Of ComponentOccurrence) = doc.ComponentDefinition.Occurrences.OfType(Of ComponentOccurrence)()
+
+    For Each compOcc As ComponentOccurrence In compOccs
+        Dim occName As String = compOcc.Name
+        Dim newOccName As String = Replace(occName, matchingPattern, newPattern, , , CompareMethod.Text)
+        compOcc.Name = newOccName
+    Next
+
+    ' Recursively rename occurrences in referenced documents
+    For Each refDoc As Document In doc.AllReferencedDocuments
+        If TypeOf refDoc Is File Then
+            Dim file As File = refDoc.File
+            If file.FileType = FileTypeEnum.kAssemblyFileType Then
+                RenameAssemblyComponents(refDoc, matchingPattern, newPattern)
+            ElseIf file.FileType = FileTypeEnum.kPartFileType Then
+                RenamePartComponents(refDoc, matchingPattern, newPattern)
+            End If
+        End If
+    Next
 End Sub
